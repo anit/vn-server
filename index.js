@@ -5,6 +5,8 @@ const jwt = require('jsonwebtoken');
 const axios = require("axios");
 const redisClient = require('./redis');
 const apis = require('./apis');
+const districts = require('./districts');
+const utils = require('./utils');
 
 app.use(bodyParser.json()) // for parsing application/json
 app.use(
@@ -19,18 +21,23 @@ app.post('/fetchCenters', async (req, res) => {
 		token = await apis.getToken();
 	} catch(e) { console.log('Some error getting token: ', e); }
 
+	for (dis of districts) {
+		
+	}
 	try {
-		districts.forEach(async (dis) => {
-			const availCentersNow = await apis.getAvailableCenters((token && token.token), dis.id, ddmmyy(new Date()), dis.minAge || 18);
+		Promise.all(districts.map(async (dis) => {
+			const availCentersNow = await apis.getAvailableCenters((token && token.token), dis.id, utils.ddmmyy(new Date()), dis.minAge || 18);
 			availCentersNow && availCentersNow.length && dis.notifiers.forEach(async (n) => {
 				apis.notifyTelegram(availCentersNow, n.chat_id)
 			});
+			if (!availCentersNow || !availCentersNow.length) console.log(`No centers found this week for ${dis.name}`);
+		})).then(() => {
+			res.json({});
 		});
 	} catch (e) {
 		console.log('Error is ', e);
 		return res.status(400).send(`Error is ${e.toString()}`);
 	}
-	res.json({});
 });
 
 app.post('/setToken', (req, res) => {

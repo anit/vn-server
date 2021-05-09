@@ -1,6 +1,9 @@
 const fetch = require('node-fetch');
 const redisClient = require('./redis');
 const utils = require('./utils');
+const districts = require('./districts');
+const jwt = require('jsonwebtoken');
+const config = require('./config');
 
 const getToken = () => {
   return new Promise((resolve, reject) => {
@@ -8,8 +11,8 @@ const getToken = () => {
       if (err) return reject('Error: Not able to read token from redis');
       try {
         const obj = jwt.decode(val);
-        if (!obj) return reject('Invalid Token');
-        if (Date.now() > obj.exp*1000) return reject('Error: Expired token');
+        if (!obj) return reject(`Invalid Token: ${val}`);
+        if (Date.now() > obj.exp*1000) return reject(`Error: Expired token ${val}`);
   
         resolve({token: val});
       } catch(e) {
@@ -23,7 +26,9 @@ const getAvailableCenters = (token, districtId, date, minAge = 18) => {
   let url = `https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict?district_id=${districtId}&date=${date}`;
   let headers = {
     Accept: 'application/json',
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'Accept-Encoding': 'gzip',
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) ReactNativeDebugger/0.11.8 Chrome/80.0.3987.165 Electron/8.5.2 Safari/537.36'
   };
 
   if (token) {
@@ -36,7 +41,7 @@ const getAvailableCenters = (token, districtId, date, minAge = 18) => {
       method: 'GET',
       headers 
     })
-    .then(response => response.json())
+    .then(response => { return response.json(); })
     .then(json => {
       if (json) resolve(parseAvailableCenters(json, minAge));
       else reject('Something went wrong in making json of available centers');
