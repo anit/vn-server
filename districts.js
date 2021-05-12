@@ -4,7 +4,7 @@ module.exports = [
   { id: 314, name: 'Indore', notifiers: [{ type: 'tg', chat_id: -1001477347698 }] },
   { id: 315, name: 'Jabalpur', notifiers: [{ type: 'tg', chat_id: -1001468768159 }] },
   { id: 318, name: 'Ujjain', notifiers: [{ type: 'tg', chat_id: '@vaccineujjain' }] },
-  
+
 
   /////////Maharashtra
   { id: 395, name: 'Mumbai', notifiers: [{ type: 'tg', chat_id: -1001288470418 }] },
@@ -19,8 +19,8 @@ module.exports = [
   { id: 154, name: 'Ahmedabad', notifiers: [{ type: 'tg', chat_id: -1001317979883 }] },
   { id: 770, name: 'Ahmedabad Corporation', notifiers: [{ type: 'tg', chat_id: -1001317979883 }] },
   { id: 179, name: 'Anand', notifiers: [{ type: 'tg', chat_id: -1001494168043 }] },
-  { id: 155, name: 'Vadodara', notifiers: [{ type: 'tg', chat_id: -1001494168043 }, { type: 'tg', chat_id: -500113783 }] },
-  { id: 777, name: 'Vadodara Corporation', notifiers: [{ type: 'tg', chat_id: -1001494168043 }, { type: 'tg', chat_id: -500113783 }] },
+  { id: 155, name: 'Vadodara', notifiers: [{ type: 'tg', chat_id: -1001494168043 }] },
+  { id: 777, name: 'Vadodara Corporation', notifiers: [{ type: 'tg', chat_id: -1001494168043 }] },
   { id: 180, name: 'Bharuch', notifiers: [{ type: 'tg', chat_id: -1001264356048 }] },
   { id: 165, name: 'Surat', notifiers: [{ type: 'tg', chat_id: -1001244127509 }] },
   { id: 166, name: 'Tapi', notifiers: [{ type: 'tg', chat_id: -1001244127509 }] },
@@ -40,10 +40,10 @@ module.exports = [
   { id: 663, name: 'Kanpur Dehat', notifiers: [{ type: 'tg', chat_id: -1001269960161 }] },
   { id: 651, name: 'Ghaziabad', notifiers: [{ type: 'tg', chat_id: -1001150141067 }] },
   { id: 650, name: 'Noida', notifiers: [{ type: 'tg', chat_id: -1001150141067 }] },
- 
-  
+
+
   // Uttarakhand
-  
+
   { id: 697, name: 'Dehradun', notifiers: [{ type: 'tg', chat_id: '@vaccinedehradunharidwar' }] },
   { id: 702, name: 'Haridwar', notifiers: [{ type: 'tg', chat_id: '@vaccinedehradunharidwar' }] },
 
@@ -52,13 +52,13 @@ module.exports = [
 
   // Punjab
   { id: 488, name: 'Ludhiana', notifiers: [{ type: 'tg', chat_id: '@vaccineludhiana' }] },
- 
+
   // Haryana
   { id: 188, name: 'Gurgaon', notifiers: [{ type: 'tg', chat_id: -1001150141067 }] },
   { id: 199, name: 'Faridabad',notifiers: [{ type: 'tg', chat_id: -1001150141067 }] },
   { id: 192, name: 'Rohtak', notifiers: [{ type: 'tg', chat_id: -1001488087088 }] },
   { id: 203, name: 'Karnal', notifiers: [{ type: 'tg', chat_id: -1001488087088 }] },
-  
+
   // Andhra Pradesh
   { id: 581, name: 'Hyderabad', notifiers: [{ type: 'tg', chat_id: -1001212522963 }] },
 
