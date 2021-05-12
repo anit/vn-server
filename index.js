@@ -30,6 +30,7 @@ app.post('/fetchCenters', async (req, res) => {
 		Promise.all(districts.map(async (dis) => {
 			const availCentersNow = await apis.getAvailableCenters((token && token.token), dis.id, utils.ddmmyy(new Date()), dis.minAge || 18);
 			availCentersNow && availCentersNow.length && dis.notifiers.forEach(async (n) => {
+				if (n.chat_id == -1001494168043)  await new Promise(resolve => setTimeout(resolve, 10000));
 				apis.notifyTelegram(availCentersNow, n.chat_id)
 			});
 			if (!availCentersNow || !availCentersNow.length) console.log(`No centers found this week for ${dis.name}`);
