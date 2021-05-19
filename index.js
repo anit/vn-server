@@ -32,8 +32,9 @@ app.post('/fetchCenters', async (req, res) => {
 		Promise.all(districts.map(async (dis) => {
 				const [availCenters18, availCenters45] = await apis.getAvailableCenters((token && token.token), dis.id, utils.ddmmyy(new Date()), !!dis.chan18, !!dis.chan45);
 				
-				// availCenters18 && apis.notifyTelegram(availCenters18, dis.chan18);
-				// availCenters45 && apis.notifyTelegram(availCenters45, dis.chan45)
+				availCenters18 && availCenters18.length > 0 && apis.notifyTelegram(availCenters18, dis.chan18).catch(err => console.log('Error notifying telegram: ', err));
+				availCenters45 && availCenters45.length > 0 && apis.notifyTelegram(availCenters45, dis.chan45).catch(err => console.log('Error notifying telegram: ', err));
+
 
 				availCenters18 && results.push(...availCenters18.map(x => ({ ...x, minAge: 18 })));
 				availCenters45 && results.push(...availCenters45.map(x => ({ ...x, minAge: 45 })));

@@ -46,6 +46,7 @@ const getAvailableCenters = (token, districtId, date, shud18, shud45) => {
     .then(response => { return response.json(); })
     .then(async (json) => {
       if (!json) reject('Something went wrong in making json of available centers');
+
       else resolve([
         shud18 && await filterOutDuplicates(parseAvailableCenters(json, 18)),
         shud45 && await filterOutDuplicates(parseAvailableCenters(json, 45))
@@ -59,7 +60,7 @@ const getAvailableCenters = (token, districtId, date, shud18, shud45) => {
 const parseAvailableCenters = (json, minAge) => {
   if (!json.centers) return [];
 
-  return json.centers.reduce((allCenters, center) => {
+  const centers = json.centers.reduce((allCenters, center) => {
     return allCenters.concat(...center.sessions.filter(x => {
       return x.min_age_limit == minAge && (x.available_capacity_dose1 > 1 || x.available_capacity_dose2 > 1);
     }).map(x => {
@@ -76,34 +77,51 @@ const parseAvailableCenters = (json, minAge) => {
       }
     }));
   }, []);
+
+  return centers;
 };
+const updateRedisKey = (key, newValue) => {
+  return new Promise((resolve, reject) => {
+    localRedis.del(key, (err, res) => {
+      if (err) reject(err);
+      else localRedis.setex(key, 3000, newValue, (err, res) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  })
+}
+
+const getRedisKey = (key) => {
+  return new Promise((resolve, reject) => {
+    localRedis.get(key, (err, res) => {
+      if (err) reject(err);
+      else resolve(res);
+    });
+  });
+}
 
 
 const filterOutDuplicates = async (centers) => {
-  return await Promise.all(centers.filter(async (c) => {
-    const val = await new Promise((resolve, reject) => {
-      localRedis.get(`${c.center_id}-${c.pincode}-${c.minAge}`, (err, res) => {
-        if (err) reject(err);
-        else resolve(res);
-      });
-    });
+  if (!centers) return;
+
+  const finalCenters = [];
+  for (var c of centers) {
+    const rkey = `${c.center_id}-${c.pincode}-${c.date}-${c.minAge}`;
+    const val = await getRedisKey(rkey);
+     
     try {
-      if (val == `${c.available1}-${c.available2}`) {
-        console.log('filtering out ', c.center)
-        return false;
+      if (val && val == `${c.available1}-${c.available2}`) continue;
+      else {
+        updateRedisKey(rkey, `${c.available1}-${c.available2}`).then(() => {
+          finalCenters.push(c);
+        });
       }
-
-      console.log('Letting go', c.center);
-      localRedis.setex(`${c.center_id}-${c.pincode}-${c.minAge}`, 3000, `${c.available1}-${c.available2}`);
-      return true;
     } catch (e) {
-      console.log('Error redising  is  ', e)
-
-      console.log('Letting go', c.center);
-      localRedis.setex(`${c.center_id}-${c.pincode}-${c.minAge}`, 3000, `${c.available1}-${c.available2}`);
-      return true;
+      console.log('Error redising  is  ', c, e);
     }
-  }));
+  }
+  return finalCenters;
 }
 
 const fetchDistricts = (stateId) => {
@@ -121,8 +139,6 @@ const fetchDistricts = (stateId) => {
 
 
 const notifyTelegram = (json, chat_id) => {
-  if (!json || !json.length) return;
-
   var reply_markup =  {
     inline_keyboard: [[
       {
