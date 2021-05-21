@@ -55,6 +55,8 @@ app.post('/getCaptcha', async (req, res) => {
 		.catch(err => res.status(400).send(err.toString()));
 });
 
+app.get('/', (req, res) => res.json({ hello: 'world' }))
+
 // Finally, start our server
 app.listen(process.env.PORT || 8080, function() {
 	console.log("Telegram app listening !")
