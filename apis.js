@@ -6,184 +6,78 @@ const config = require('./config');
 const NodeCache = require( "node-cache" );
 const myCache = new NodeCache({ stdTTL: 100, checkperiod: 120 });
 const localRedis = require('./localRedis');
+const CryptoJS = require("crypto-js");
+const sha256 = require('crypto-js/sha256');
+const jwt = require('jsonwebtoken');
 
-const getToken = () => {
-  return new Promise((resolve, reject) => {
-    redisClient.get('token', (err, val) => {
-      if (err) return reject('Error: Not able to read token from redis');
-      try {
-        const obj = jwt.decode(val);
-        if (!obj) return reject(`Invalid Token: ${val}`);
-        if (Date.now() > obj.exp*1000) return reject(`Error: Expired token ${val}`);
-  
-        resolve({token: val});
-      } catch(e) {
-        reject(`Error: ${e.toString()}`);
-      }
-    });  
-  })
+const getSecret = () => {
+  return CryptoJS.AES.encrypt(config.cowinId, config.cowinKey).toString();
 }
 
-const getAvailableCenters = (token, districtId, date, shud18, shud45) => {
-  let url = `https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict?district_id=${districtId}&date=${date}`;
-  let headers = {
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-    'Accept-Encoding': 'gzip',
-    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) ReactNativeDebugger/0.11.8 Chrome/80.0.3987.165 Electron/8.5.2 Safari/537.36'
-  };
-
-  if (token) {
-    headers ['authorization'] = `Bearer ${token}`;
-    url = `https://cdn-api.co-vin.in/api/v2/appointment/sessions/calendarByDistrict?district_id=${districtId}&date=${date}`;
-  }
-
+const requestOTP = (mobile) => {
+  const secret = getSecret();
   return new Promise((resolve, reject) => {
-    fetch(url, {
-      method: 'GET',
-      headers 
+    console.log('Fetching otp for ', { mobile: config.user.mobile, secret })
+    fetch('https://cdn-api.co-vin.in/api/v2/auth/generateMobileOTP', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ mobile: config.user.mobile, secret })
     })
-    .then(response => { return response.json(); })
-    .then(async (json) => {
-      if (!json) reject('Something went wrong in making json of available centers');
-
-      else resolve([
-        shud18 && await filterOutDuplicates(parseAvailableCenters(json, 18)),
-        shud45 && await filterOutDuplicates(parseAvailableCenters(json, 45))
-      ]); 
+    .then(response => {
+      if (!response.ok) throw new Error(response.statusText);
+      return response.json();
     })
-    .catch(e => { console.log('Error getting available centers: ', e); reject(e); });
-  });
-};
+    .then(json => {
+      if (json && json.txnId) resolve(json.txnId);
+      else reject('No response got from CoWin');
+    })
+    .catch(e => { console.log('Error retrieving otp: ', e); reject(e); });
+  }) 
+}
 
-
-const parseAvailableCenters = (json, minAge) => {
-  if (!json.centers) return [];
-
-  const centers = json.centers.reduce((allCenters, center) => {
-    return allCenters.concat(...center.sessions.filter(x => {
-      return x.min_age_limit == minAge && (x.available_capacity_dose1 > 1 || x.available_capacity_dose2 > 1);
-    }).map(x => {
-      return { 
-        minAge, 
-        center_id: center.center_id,
-        center: center.name, 
-        district: center.district_name, 
-        pincode: center.pincode, 
-        date: x.date, 
-        vaccine: x.vaccine, 
-        available1: x.available_capacity_dose1 < 0 ? 0 : x.available_capacity_dose1, 
-        available2: x.available_capacity_dose2 < 0 ? 0 : x.available_capacity_dose2 
+const validateOTP = async (otp, txnId) => {
+  const hash = sha256(otp).toString()
+  return new Promise((resolve, reject) => {
+    fetch('https://cdn-api.co-vin.in/api/v2/auth/validateMobileOtp', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ otp: hash, txnId })
+    })
+    .then(response => {
+      if (!response.ok) throw new Error(response.statusText);
+      return response.json();
+    })
+    .then(json => {
+      if (json) { 
+        resolve(json);
+        setToken(json.token);
       }
-    }));
-  }, []);
-
-  return centers;
-};
-const updateRedisKey = (key, newValue) => {
-  return new Promise((resolve, reject) => {
-    localRedis.del(key, (err, res) => {
-      if (err) reject(err);
-      else localRedis.setex(key, 3000, newValue, (err, res) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
-  })
+      else reject('No response from CoWin');
+    })
+    .catch(e => { console.log('Error validating otp: ', e); reject(e); });
+  }) 
 }
 
-const getRedisKey = (key) => {
-  return new Promise((resolve, reject) => {
-    localRedis.get(key, (err, res) => {
-      if (err) reject(err);
-      else resolve(res);
-    });
-  });
-}
-
-
-const filterOutDuplicates = async (centers) => {
-  if (!centers) return;
-
-  const finalCenters = [];
-  for (var c of centers) {
-    const rkey = `${c.center_id}-${c.pincode}-${c.date}-${c.minAge}`;
-    const val = await getRedisKey(rkey);
-     
+const setToken = (token) => {
+  new Promise ((resolve, reject) => {
     try {
-      if (val && val == `${c.available1}-${c.available2}`) continue;
-      else {
-        updateRedisKey(rkey, `${c.available1}-${c.available2}`).then(() => {
-          finalCenters.push(c);
-        });
-      }
-    } catch (e) {
-      console.log('Error redising  is  ', c, e);
-    }
-  }
-  return finalCenters;
-}
-
-const fetchDistricts = (stateId) => {
-  return fetch(`https://cdn-api.co-vin.in/api/v2/admin/location/districts/${stateId}`, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      'Accept-Encoding': 'gzip',
-      'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) ReactNativeDebugger/0.11.8 Chrome/80.0.3987.165 Electron/8.5.2 Safari/537.36'
-    }
-  })
-  .then(response => { return response.json(); })
-}
-
-
-const notifyTelegram = (json, chat_id) => {
-  var reply_markup =  {
-    inline_keyboard: [[
-      {
-        text: 'Open Cowin',
-        url: 'https://selfregistration.cowin.gov.in'            
-      }]
-    ]
-  };
-
-  const text = tgMessage(json);
+      const obj = jwt.decode(token);
+      if (Date.now() > obj.exp*1000) return;
   
-  return fetch(`https://api.telegram.org/bot${config.tgBot.token}/sendMessage?parse_mode=html`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ chat_id, text, reply_markup })
-  });
+      const expiry = obj.exp - (Date.now()/1000) - 5;
+      redisClient.setex('token', Math.floor(expiry), token, err => {
+        if (err) reject();
+        resolve({ token });
+      });
+    } catch (e) { reject(`Error: Something went wrong ${e.toString()}`) }
+  }); 
 }
 
 
-const memCount = (chat_id) => {
-  return fetch(`https://api.telegram.org/bot${config.tgBot.token}/getChatMembersCount?chat_id=${chat_id}`, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json'
-    }
-  }).then(res => res.json());
-}
-
-
-const tgMessage = (json) => [
-  '<b>New available slots</b> \n\n',
-  ...json.map(x => [
-    `📍 Pin Code <b>${x.pincode}</b>`,
-    x.available1 > 1 ? `🪑 Dose 1️⃣ Available <b>${x.available1}</b>` : '',
-    x.available2 > 1 ? `🪑 Dose 2️⃣ Available <b>${x.available2}</b>` : '', 
-    `🗓 ${x.date}`,
-    `💉 ${utils.capitalize(x.vaccine) || '?'}`,
-    `🏥 ${x.center}, <b>${x.district}</b>\n\n`,
-  ].filter(x => !!x).join('\n')),
-  '•••••\n\n'
-].join('');
-
-
-module.exports = { notifyTelegram, tgMessage, getAvailableCenters, parseAvailableCenters, getToken, fetchDistricts, filterOutDuplicates, memCount }
+module.exports = { validateOTP, requestOTP, setToken }
