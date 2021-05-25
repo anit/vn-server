@@ -24,13 +24,13 @@ const getToken = () => {
   })
 }
 
-const getAvailableCenters = (token, districtId, date, shud18, shud45) => {
+const getAvailableCenters = (token, districtId, date, shud18, shud45, shud18_2) => {
   let url = `https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict?district_id=${districtId}&date=${date}`;
   let headers = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
     'Accept-Encoding': 'gzip',
-    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) ReactNativeDebugger/0.11.8 Chrome/80.0.3987.165 Electron/8.5.2 Safari/537.36'
+    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1'
   };
 
   if (token) {
@@ -43,13 +43,19 @@ const getAvailableCenters = (token, districtId, date, shud18, shud45) => {
       method: 'GET',
       headers 
     })
-    .then(response => { return response.json(); })
+    .then(response => {
+      // console.log(`Cached is ${response.headers.get('x-cache')} for ${districtId}`);
+      if (!response.ok) throw new Error(`Error ${response.status} while fetching for ${districtId}: ${response.statusText  }`) 
+      if (response.ok) return response.json(); 
+    })
     .then(async (json) => {
       if (!json) reject('Something went wrong in making json of available centers');
+      if (districtId == 307) console.log('Kochi data is ', parseAvailableCenters(json, 18));
 
       else resolve([
-        shud18 && await filterOutDuplicates(parseAvailableCenters(json, 18)),
-        shud45 && await filterOutDuplicates(parseAvailableCenters(json, 45))
+        shud18 && await filterOutDuplicates(parseAvailableCenters(json, 18, 1)),
+        shud45 && await filterOutDuplicates(parseAvailableCenters(json, 45)),
+        shud18_2 && await filterOutDuplicates(parseAvailableCenters(json, 18, 2))
       ]); 
     })
     .catch(e => { console.log('Error getting available centers: ', e); reject(e); });
@@ -57,34 +63,38 @@ const getAvailableCenters = (token, districtId, date, shud18, shud45) => {
 };
 
 
-const parseAvailableCenters = (json, minAge) => {
+const parseAvailableCenters = (json, minAge, dose) => {
   if (!json.centers) return [];
 
   const centers = json.centers.reduce((allCenters, center) => {
     return allCenters.concat(...center.sessions.filter(x => {
+      if (dose == 1) return x.min_age_limit == minAge && (x.available_capacity_dose1 > 1);
+      else if (dose == 2) return x.min_age_limit == minAge && (x.available_capacity_dose2 > 1);
       return x.min_age_limit == minAge && (x.available_capacity_dose1 > 1 || x.available_capacity_dose2 > 1);
     }).map(x => {
       return { 
         minAge, 
         center_id: center.center_id,
+        session_id: x.session_id,
         center: center.name, 
+        slots: x.slots,
         district: center.district_name, 
         pincode: center.pincode, 
         date: x.date, 
         vaccine: x.vaccine, 
-        available1: x.available_capacity_dose1 < 0 ? 0 : x.available_capacity_dose1, 
-        available2: x.available_capacity_dose2 < 0 ? 0 : x.available_capacity_dose2 
+        available1: (x.available_capacity_dose1 < 0 || dose == 2) ? 0 : x.available_capacity_dose1, 
+        available2: (x.available_capacity_dose2 < 0 || dose == 1) ? 0 : x.available_capacity_dose2 
       }
     }));
   }, []);
 
   return centers;
 };
-const updateRedisKey = (key, newValue) => {
+const updateRedisKey = (key, newValue, timeout) => {
   return new Promise((resolve, reject) => {
     localRedis.del(key, (err, res) => {
       if (err) reject(err);
-      else localRedis.setex(key, 3000, newValue, (err, res) => {
+      else localRedis.setex(key, timeout || 3000, newValue, (err, res) => {
         if (err) reject(err);
         else resolve();
       });
@@ -112,12 +122,10 @@ const filterOutDuplicates = async (centers) => {
      
     try {
       if (val && val == `${c.available1}-${c.available2}`) continue;
-      else {
-        updateRedisKey(rkey, `${c.available1}-${c.available2}`).then(() => {
-          finalCenters.push(c);
-        });
-      }
+      await updateRedisKey(rkey, `${c.available1}-${c.available2}`);
+      finalCenters.push(c);
     } catch (e) {
+      finalCenters.push(c);
       console.log('Error redising  is  ', c, e);
     }
   }
@@ -178,6 +186,9 @@ const tgMessage = (json) => [
     `📍 Pin Code <b>${x.pincode}</b>`,
     x.available1 > 1 ? `🪑 Dose 1️⃣ Available <b>${x.available1}</b>` : '',
     x.available2 > 1 ? `🪑 Dose 2️⃣ Available <b>${x.available2}</b>` : '', 
+
+    // x.available1 > 1 ? `🪑 Dose 1️⃣ Available <b>${x.available1}</b> (<a href="${`https://book.r41.io?cid=${x.center_id}&slot=${x.slots}&date=${x.date}&cn=${x.center}&sid=${x.session_id}&dose=1&age=${x.minAge}`}">Book [Testing]</a>)` : '',
+    // x.available2 > 1 ? `🪑 Dose 2️⃣ Available <b>${x.available2}</b> (<a href="${`https://book.r41.io?cid=${x.center_id}&slot=${x.slots}&date=${x.date}&cn=${x.center}&sid=${x.session_id}&dose=2&age=${x.minAge}`}">Book [Testing]</a>)` : '', 
     `🗓 ${x.date}`,
     `💉 ${utils.capitalize(x.vaccine) || '?'}`,
     `🏥 ${x.center}, <b>${x.district}</b>\n\n`,
@@ -186,4 +197,4 @@ const tgMessage = (json) => [
 ].join('');
 
 
-module.exports = { notifyTelegram, tgMessage, getAvailableCenters, parseAvailableCenters, getToken, fetchDistricts, filterOutDuplicates, memCount }
+module.exports = { notifyTelegram, tgMessage, getAvailableCenters, parseAvailableCenters, getToken, fetchDistricts, filterOutDuplicates, memCount, updateRedisKey }

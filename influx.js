@@ -1,7 +1,6 @@
 const Influx = require('influx');
 const config = require('./config');
 
-
 // a custom schema
 const client = new Influx.InfluxDB({
   ...config.influx,
@@ -53,7 +52,7 @@ module.exports = {
         fields: { count: count },
         tags: { channel }
      } 
-    })).then(res => console.log('Successfully wrote ', res)).catch(err => {
+    })).catch(err => {
       console.error(`Error saving memcount to InfluxDB! ${err.stack}`)
     })
   }

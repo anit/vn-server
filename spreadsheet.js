@@ -32,7 +32,8 @@ async function getDistricts() {
     id: x[0],
     district: x[1],
     chan18: x[2],
-    chan45: x[3]
+    chan45: x[3],
+    chan18_2: x[4]
   })).filter(dis => (dis.chan18 || dis.chan45) && dis.id && dis.district);
 }
 module.exports = {

@@ -30,14 +30,16 @@ app.post('/fetchCenters', async (req, res) => {
 	try {
 		const districts = await getDistricts();
 		Promise.all(districts.map(async (dis) => {
-				const [availCenters18, availCenters45] = await apis.getAvailableCenters((token && token.token), dis.id, utils.ddmmyy(new Date()), !!dis.chan18, !!dis.chan45);
-				
+				const [availCenters18, availCenters45, availCenters18_2] = await apis.getAvailableCenters((token && token.token), dis.id, utils.ddmmyy(new Date()), !!dis.chan18, !!dis.chan45, !!dis.chan18_2);
+
 				availCenters18 && availCenters18.length > 0 && apis.notifyTelegram(availCenters18, dis.chan18).catch(err => console.log('Error notifying telegram: ', err));
 				availCenters45 && availCenters45.length > 0 && apis.notifyTelegram(availCenters45, dis.chan45).catch(err => console.log('Error notifying telegram: ', err));
-
+				availCenters18_2 && availCenters18_2.length > 0 && apis.notifyTelegram(availCenters18_2, dis.chan18_2).catch(err => console.log('Error notifying telegram: ', err));
+				
 
 				availCenters18 && results.push(...availCenters18.map(x => ({ ...x, minAge: 18 })));
 				availCenters45 && results.push(...availCenters45.map(x => ({ ...x, minAge: 45 })));
+				availCenters18_2 && results.push(...availCenters18_2.map(x => ({ ...x, minAge: 18 })));
 		})).then(() => {
 			res.json({});
 		}).finally(() => {
@@ -89,14 +91,14 @@ app.get('/memCount', async (req, res) => {
 	const allChannels = [];
 
 	districts.map(x => {
-		allChannels.push(...[ x.chan18, x.chan45 ]);
+		allChannels.push(...[ x.chan18, x.chan45, x.chan18_2 ]);
 	});
 
 	const allCounts = await Promise.all(
 		allChannels.filter(x => !!x).map(async (x, index) => {
 
 			// force a timeout after every 10 api call. 
-			if (index > 0 && index%10 > 0) await new Promise(resolve => setTimeout(resolve, 2));
+			if (index > 0 && index%10 > 0) await new Promise(resolve => setTimeout(resolve, 5));
 
 			const count = await apis.memCount(x);
 			return { channel: x, count: count.result || null };
