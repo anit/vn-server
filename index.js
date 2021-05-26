@@ -55,6 +55,16 @@ app.post('/getCaptcha', async (req, res) => {
 		.catch(err => res.status(400).send(err.toString()));
 });
 
+app.post('/schedule', async (req, res) => {
+	const { token } = req.body;
+	if (!token) return res.status(400).send('No valid token found');
+
+	apis
+		.schedule(req.body)
+		.then(cap => res.json(cap))
+		.catch(err => res.status(400).send(err.toString()));
+});
+
 app.get('/', (req, res) => res.json({ hello: 'world' }))
 
 // Finally, start our server
