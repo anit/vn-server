@@ -50,9 +50,6 @@ app.post('/fetchCenters', async (req, res) => {
 			console.log('Something went wrong fetching centers....', e);
 			clearTimeout(timeoutId);
 			return res.status(400).send(`Error is ${e.toString()}`);
-		})
-		.finally(() => {
-			clearTimeout(timeoutId);
 		});
 	} catch (e) {
 		console.log('Error is ', e);
