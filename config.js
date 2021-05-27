@@ -12,7 +12,8 @@ module.exports = {
  },
  influx: {
   database: 'telegraf',
-  host: 'apis.r41.io',
+  host: '143.110.246.140',
+  port: 8086,
   username: 'telegraf',
   password: 'pass@vaccinenotifier-telegraf',
  }

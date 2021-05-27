@@ -7,6 +7,7 @@ const NodeCache = require( "node-cache" );
 const myCache = new NodeCache({ stdTTL: 100, checkperiod: 120 });
 const localRedis = require('./localRedis');
 
+
 const getToken = () => {
   return new Promise((resolve, reject) => {
     redisClient.get('token', (err, val) => {
@@ -41,7 +42,7 @@ const getAvailableCenters = (token, districtId, date, shud18, shud45, shud18_2) 
   return new Promise((resolve, reject) => {
     fetch(url, {
       method: 'GET',
-      headers 
+      headers
     })
     .then(response => {
       // console.log(`Cached is ${response.headers.get('x-cache')} for ${districtId}`);
@@ -53,9 +54,9 @@ const getAvailableCenters = (token, districtId, date, shud18, shud45, shud18_2) 
       if (districtId == 307) console.log('Kochi data is ', parseAvailableCenters(json, 18));
 
       else resolve([
-        shud18 && await filterOutDuplicates(parseAvailableCenters(json, 18, 1)),
-        shud45 && await filterOutDuplicates(parseAvailableCenters(json, 45)),
-        shud18_2 && await filterOutDuplicates(parseAvailableCenters(json, 18, 2))
+        shud18 && await parseAvailableCenters(json, 18, 1),
+        shud45 && await parseAvailableCenters(json, 45),
+        shud18_2 && await parseAvailableCenters(json, 18, 2)
       ]); 
     })
     .catch(e => { console.log('Error getting available centers: ', e); reject(e); });
@@ -82,8 +83,8 @@ const parseAvailableCenters = (json, minAge, dose) => {
         pincode: center.pincode, 
         date: x.date, 
         vaccine: x.vaccine, 
-        available1: (x.available_capacity_dose1 < 0 || dose == 2) ? 0 : x.available_capacity_dose1, 
-        available2: (x.available_capacity_dose2 < 0 || dose == 1) ? 0 : x.available_capacity_dose2 
+        available1: (x.available_capacity_dose1 < 1 || dose == 2) ? 0 : x.available_capacity_dose1, 
+        available2: (x.available_capacity_dose2 < 1 || dose == 1) ? 0 : x.available_capacity_dose2 
       }
     }));
   }, []);
@@ -156,7 +157,7 @@ const notifyTelegram = (json, chat_id) => {
     ]
   };
 
-  const text = tgMessage(json);
+  const text = chat_id == '@vaccinepune' ? tgMessageUpgraded(json) : tgMessage(json);
   
   return fetch(`https://api.telegram.org/bot${config.tgBot.token}/sendMessage?parse_mode=html`, {
     method: 'POST',
@@ -179,6 +180,19 @@ const memCount = (chat_id) => {
   }).then(res => res.json());
 }
 
+const tgMessageUpgraded = (json) => [
+  '<b>New available slots</b> \n\n',
+  ...json.map(x => [
+    `📍 Pin Code <b>${x.pincode}</b>`,
+    x.available1 > 1 ? `🪑 Dose 1️⃣ Available <b>${x.available1}</b> (<a href="${`https://vn-booker.tunnelto.dev?cid=${x.center_id}&slot=${x.slots}&date=${x.date}&cn=${x.center}&sid=${x.session_id}&dose=1&age=${x.minAge}`}">Book [Beta]</a>)` : '',
+    x.available2 > 1 ? `🪑 Dose 2️⃣ Available <b>${x.available2}</b> (<a href="${`https://vn-booker.tunnelto.dev?cid=${x.center_id}&slot=${x.slots}&date=${x.date}&cn=${x.center}&sid=${x.session_id}&dose=2&age=${x.minAge}`}">Book [Beta]</a>)` : '', 
+    `🗓 ${x.date}`,
+    `💉 ${utils.capitalize(x.vaccine) || '?'}`,
+    `🏥 ${x.center}, <b>${x.district}</b>\n\n`,
+  ].filter(x => !!x).join('\n')),
+  '•••••\n\n'
+].join('');
+
 
 const tgMessage = (json) => [
   '<b>New available slots</b> \n\n',
@@ -186,9 +200,6 @@ const tgMessage = (json) => [
     `📍 Pin Code <b>${x.pincode}</b>`,
     x.available1 > 1 ? `🪑 Dose 1️⃣ Available <b>${x.available1}</b>` : '',
     x.available2 > 1 ? `🪑 Dose 2️⃣ Available <b>${x.available2}</b>` : '', 
-
-    // x.available1 > 1 ? `🪑 Dose 1️⃣ Available <b>${x.available1}</b> (<a href="${`https://book.r41.io?cid=${x.center_id}&slot=${x.slots}&date=${x.date}&cn=${x.center}&sid=${x.session_id}&dose=1&age=${x.minAge}`}">Book [Testing]</a>)` : '',
-    // x.available2 > 1 ? `🪑 Dose 2️⃣ Available <b>${x.available2}</b> (<a href="${`https://book.r41.io?cid=${x.center_id}&slot=${x.slots}&date=${x.date}&cn=${x.center}&sid=${x.session_id}&dose=2&age=${x.minAge}`}">Book [Testing]</a>)` : '', 
     `🗓 ${x.date}`,
     `💉 ${utils.capitalize(x.vaccine) || '?'}`,
     `🏥 ${x.center}, <b>${x.district}</b>\n\n`,

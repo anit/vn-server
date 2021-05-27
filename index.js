@@ -25,8 +25,10 @@ app.post('/fetchCenters', async (req, res) => {
 		token = await apis.getToken();
 	} catch(e) { console.log('Some error getting token: ', e); }
 
+
+	var timeoutId = setTimeout(() => res.json({}), 50000);
+
 	let results = [];
-	
 	try {
 		const districts = await getDistricts();
 		Promise.all(districts.map(async (dis) => {
@@ -37,13 +39,20 @@ app.post('/fetchCenters', async (req, res) => {
 				availCenters18_2 && availCenters18_2.length > 0 && apis.notifyTelegram(availCenters18_2, dis.chan18_2).catch(err => console.log('Error notifying telegram: ', err));
 				
 
-				availCenters18 && results.push(...availCenters18.map(x => ({ ...x, minAge: 18 })));
-				availCenters45 && results.push(...availCenters45.map(x => ({ ...x, minAge: 45 })));
-				availCenters18_2 && results.push(...availCenters18_2.map(x => ({ ...x, minAge: 18 })));
+				availCenters18 && inflxSlotsCaptured(availCenters18.map(x => ({ ...x, minAge: 18 })));
+				availCenters45 && inflxSlotsCaptured(availCenters45.map(x => ({ ...x, minAge: 45 })));
+				availCenters18_2 && inflxSlotsCaptured(availCenters18_2.map(x => ({ ...x, minAge: 18 })));
 		})).then(() => {
+			console.log('Completeing......')
 			res.json({});
-		}).finally(() => {
-			inflxSlotsCaptured(results);
+			clearTimeout(timeoutId);
+		}).catch(e => {
+			console.log('Something went wrong fetching centers....', e);
+			clearTimeout(timeoutId);
+			return res.status(400).send(`Error is ${e.toString()}`);
+		})
+		.finally(() => {
+			clearTimeout(timeoutId);
 		});
 	} catch (e) {
 		console.log('Error is ', e);
