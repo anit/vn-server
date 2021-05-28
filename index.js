@@ -92,6 +92,12 @@ app.get('/states', async (req, res) => {
 	res.json(allStates);
 });
 
+app.get('/districts', async (req, res) => {
+	const districts = await getDistricts();
+	res.setHeader('Content-Type', 'application/json');
+	res.json(districts)
+})
+
 app.get('/memCount', async (req, res) => {
 	const districts = await getDistricts();
 	const allChannels = [];
