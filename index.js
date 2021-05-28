@@ -5,6 +5,10 @@ var app = express()
 var bodyParser = require("body-parser")
 const apis = require('./apis');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const redisClient = require('./redis');
+
+
 
 app.use(bodyParser.json()) // for parsing application/json
 app.use(
@@ -64,6 +68,23 @@ app.post('/schedule', async (req, res) => {
 		.then(cap => res.json(cap))
 		.catch(err => res.status(400).send(err.toString()));
 });
+
+
+app.post('/setToken', (req, res) => {
+	try {
+		const obj = jwt.decode(req.body.token);
+		if (Date.now() > obj.exp*1000) return res.status(400).send('Error: Expired token');
+
+		const expiry = obj.exp - (Date.now()/1000) - 5;
+		console.log(`Setting token on ${new Date()}`);
+		redisClient.setex('token', Math.floor(expiry), req.body.token, err => {
+			if (err) return res.status(400).json({ err });
+			res.json({ token: req.body.token })
+		});
+	} catch (e) { res.status(400).send(`Error: Something went wrong ${e.toString()}`) }
+});
+
+
 
 app.get('/', (req, res) => res.json({ hello: 'world' }))
 

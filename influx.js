@@ -9,7 +9,8 @@ const client = new Influx.InfluxDB({
     {
       measurement: 'cw_api_err',
       fields: {
-        text: Influx.FieldType.STRING
+        text: Influx.FieldType.STRING,
+        mobile: Influx.FieldType.STRING
       },
       tags: ['api', 'status']
     },
@@ -26,10 +27,10 @@ const client = new Influx.InfluxDB({
 module.exports = {
   inflxCwApi: (data) => {
     if (!data) return;
-    const { text, api, status, dose } = data;      
+    const { text, api, status, mobile } = data;      
     client.writePoints([{
       measurement: 'cw_api_err',
-      fields: { text },
+      fields: { text, mobile: mobile || 'NA' },
       tags: { api, status }
     }]).catch(err => {
       console.error(`Error saving data to InfluxDB! ${err.stack}`)
@@ -43,7 +44,9 @@ module.exports = {
       measurement: 'scheduled',
       fields: { benes },
       tags: { center_id, dose }
-    }]).catch(err => {
+    }])
+    .then(w => console.log('Successfully Wrote A Schedule.........', data))
+    .catch(err => {
       console.error(`Error saving data to InfluxDB! ${err.stack}`)
     })
   }

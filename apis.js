@@ -45,7 +45,7 @@ const requestOTP = (mobile) => {
     })
     .then(response => {
       if (!response.ok) {
-        response.text().then(text => inflxCwApi({ api: 'generateMobileOTP', status: response.status, text }));
+        response.text().then(text => inflxCwApi({ api: 'generateMobileOTP', status: response.status, text, mobile }));
         throw new Error(response.statusText);
       }
       return response.json();
@@ -156,7 +156,7 @@ const getRecaptha = (token) => {
 }
 
 const schedule = (data) => {
-  const url = 'https://cdn-api.co-vin.in/api/v2/auth/schedule';
+  const url = 'https://cdn-api.co-vin.in/api/v2/appointment/schedule';
   const { center_id, session_id, beneficiaries, slot, captcha, dose, token } = data;
   const headers = {
     ...commonHeaders,
@@ -171,17 +171,17 @@ const schedule = (data) => {
     })
     .then(response => {
       if (!response.ok) {
-        response.text().then(text => inflxCwApi({ api: 'schedule', status: response.status, text }));
-        throw new Error(response.statusText);
-      }
-      return response.json();
+        response.text().then(text => {
+          inflxCwApi({ api: 'schedule', status: response.status, text });
+          reject(text);
+        });
+      } else return response.json();
     })
    .then(json => {
       if (json) {
         inflxScheduled({ dose, center_id, benes: beneficiaries.length })
         resolve(json);
       }
-      else reject('Not able to schedule');
     })
     .catch(e => { console.log('Error scheduling: ', e); reject(e); });
   });
