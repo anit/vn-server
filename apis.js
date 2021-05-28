@@ -158,9 +158,9 @@ const notifyTelegram = (json, chat_id) => {
   };
 
   // const text = (chat_id == '@vaccinepune' || chat_id == '@vaccinebarodaanand' || chat_id == '@vaccineahmedabad') ? tgMessageUpgraded(json) : tgMessage(json);
-  // const text = tgMessage(json);
+  const text = tgMessage(json);
 
-  const text = tgMessageUpgraded(json);
+  // const text = tgMessageUpgraded(json);
 
   return fetch(`https://api.telegram.org/bot${config.tgBot.token}/sendMessage?parse_mode=html`, {
     method: 'POST',
