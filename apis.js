@@ -8,6 +8,13 @@ const myCache = new NodeCache({ stdTTL: 100, checkperiod: 120 });
 const localRedis = require('./localRedis');
 
 
+const commonHeaders = {
+  'accept': 'application/json',
+  'Sec-Fetch-Dest': 'empty',
+  'content-type': 'application/json',
+  'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0',
+}
+
 const getToken = () => {
   return new Promise((resolve, reject) => {
     redisClient.get('token', (err, val) => {
@@ -28,10 +35,7 @@ const getToken = () => {
 const getAvailableCenters = (token, districtId, date, shud18, shud45, shud18_2) => {
   let url = `https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict?district_id=${districtId}&date=${date}`;
   let headers = {
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-    'Accept-Encoding': 'gzip',
-    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1'
+    ...commonHeaders
   };
 
   if (token) {
@@ -40,6 +44,8 @@ const getAvailableCenters = (token, districtId, date, shud18, shud45, shud18_2) 
   }
 
   return new Promise((resolve, reject) => {
+
+    console.log('Requesting for ', districtId);
     fetch(url, {
       method: 'GET',
       headers
@@ -51,15 +57,17 @@ const getAvailableCenters = (token, districtId, date, shud18, shud45, shud18_2) 
     })
     .then(async (json) => {
       if (!json) reject('Something went wrong in making json of available centers');
-      if (districtId == 307) console.log('Kochi data is ', parseAvailableCenters(json, 18));
 
       else resolve([
         shud18 && await parseAvailableCenters(json, 18, 1),
         shud45 && await parseAvailableCenters(json, 45),
         shud18_2 && await parseAvailableCenters(json, 18, 2)
       ]); 
+
+      console.log('Got result for ', districtId)
+
     })
-    .catch(e => { console.log('Error getting available centers: ', e); reject(e); });
+    .catch(e => { console.log('Error for ', districtId); reject(e); });
   });
 };
 

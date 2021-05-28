@@ -11,6 +11,8 @@ const { inflxSlotsCaptured, inflxMemCount } = require("./influx");
 const { getDistricts } = require("./spreadsheet");
 const states = require("./states");
 const config = require("./config");
+var cors = require('cors')
+
 
 app.use(bodyParser.json()) // for parsing application/json
 app.use(
@@ -18,6 +20,8 @@ app.use(
 		extended: true,
 	})
 ) // for parsing application/x-www-form-urlencoded
+
+app.use(cors());
 
 app.post('/fetchCenters', async (req, res) => {
 	let token = null;
@@ -31,6 +35,8 @@ app.post('/fetchCenters', async (req, res) => {
 	let results = [];
 	try {
 		const districts = await getDistricts();
+		console.log('===========================Starting Scraping============================')
+		console.log('Token is ', token);
 		Promise.all(districts.map(async (dis) => {
 				const [availCenters18, availCenters45, availCenters18_2] = await apis.getAvailableCenters((token && token.token), dis.id, utils.ddmmyy(new Date()), !!dis.chan18, !!dis.chan45, !!dis.chan18_2);
 
