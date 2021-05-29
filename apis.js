@@ -6,104 +6,13 @@ const config = require('./config');
 const NodeCache = require( "node-cache" );
 const myCache = new NodeCache({ stdTTL: 100, checkperiod: 120 });
 const localRedis = require('./localRedis');
+const { promisify } = require('util');
 
 
-const commonHeaders = {
-  'accept': 'application/json',
-  'Sec-Fetch-Dest': 'empty',
-  'content-type': 'application/json',
-  'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0',
-}
-
-const getToken = () => {
+const setRedisKey = (key, newValue, timeout) => {
   return new Promise((resolve, reject) => {
-    redisClient.get('token', (err, val) => {
-      if (err) return reject('Error: Not able to read token from redis');
-      try {
-        const obj = jwt.decode(val);
-        if (!obj) return reject(`Invalid Token: ${val}`);
-        if (Date.now() > obj.exp*1000) return reject(`Error: Expired token ${val}`);
-  
-        resolve({token: val});
-      } catch(e) {
-        reject(`Error: ${e.toString()}`);
-      }
-    });  
-  })
-}
-
-const getAvailableCenters = (token, districtId, date, shud18, shud45, shud18_2) => {
-  let url = `https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict?district_id=${districtId}&date=${date}`;
-  let headers = {
-    ...commonHeaders
-  };
-
-  if (token) {
-    headers ['authorization'] = `Bearer ${token}`;
-    url = `https://cdn-api.co-vin.in/api/v2/appointment/sessions/calendarByDistrict?district_id=${districtId}&date=${date}`;
-  }
-
-  return new Promise((resolve, reject) => {
-
-    console.log('Requesting for ', districtId);
-    fetch(url, {
-      method: 'GET',
-      headers
-    })
-    .then(response => {
-      // console.log(`Cached is ${response.headers.get('x-cache')} for ${districtId}`);
-      if (!response.ok) throw new Error(`Error ${response.status} while fetching for ${districtId}: ${response.statusText  }`) 
-      if (response.ok) return response.json(); 
-    })
-    .then(async (json) => {
-      if (!json) reject('Something went wrong in making json of available centers');
-
-      else resolve([
-        shud18 && await parseAvailableCenters(json, 18, 1),
-        shud45 && await parseAvailableCenters(json, 45),
-        shud18_2 && await parseAvailableCenters(json, 18, 2)
-      ]); 
-
-      console.log('Got result for ', districtId)
-
-    })
-    .catch(e => { console.log('Error for ', districtId); reject(e); });
-  });
-};
-
-
-const parseAvailableCenters = (json, minAge, dose) => {
-  if (!json.centers) return [];
-
-  const centers = json.centers.reduce((allCenters, center) => {
-    return allCenters.concat(...center.sessions.filter(x => {
-      if (dose == 1) return x.min_age_limit == minAge && (x.available_capacity_dose1 > 1);
-      else if (dose == 2) return x.min_age_limit == minAge && (x.available_capacity_dose2 > 1);
-      return x.min_age_limit == minAge && (x.available_capacity_dose1 > 1 || x.available_capacity_dose2 > 1);
-    }).map(x => {
-      return { 
-        minAge, 
-        center_id: center.center_id,
-        session_id: x.session_id,
-        center: center.name, 
-        slots: x.slots,
-        district: center.district_name, 
-        pincode: center.pincode, 
-        date: x.date, 
-        vaccine: x.vaccine, 
-        available1: (x.available_capacity_dose1 < 1 || dose == 2) ? 0 : x.available_capacity_dose1, 
-        available2: (x.available_capacity_dose2 < 1 || dose == 1) ? 0 : x.available_capacity_dose2 
-      }
-    }));
-  }, []);
-
-  return centers;
-};
-const updateRedisKey = (key, newValue, timeout) => {
-  return new Promise((resolve, reject) => {
-    localRedis.del(key, (err, res) => {
-      if (err) reject(err);
-      else localRedis.setex(key, timeout || 3000, newValue, (err, res) => {
+    localRedis.del(key, () => {
+      localRedis.setex(key, timeout || 60*60*3, newValue, (err, res) => {
         if (err) reject(err);
         else resolve();
       });
@@ -111,27 +20,51 @@ const updateRedisKey = (key, newValue, timeout) => {
   })
 }
 
+const delRedisKey = (key) => {
+  return new Promise((resolve, reject) => {
+    localRedis.del(key, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  })
+} 
+
+
+const matchingRedisKey = async (pattern) => {
+  const scan = promisify(localRedis.scan).bind(localRedis);
+  const found = [];
+  let cursor = '0';
+
+  do {
+    const reply = await scan(cursor, 'MATCH', pattern);
+
+    cursor = reply[0];
+    found.push(...reply[1]);
+  } while (cursor !== '0');
+
+  return found;
+}
+
+
 const getRedisKey = (key) => {
   return new Promise((resolve, reject) => {
     localRedis.get(key, (err, res) => {
-      if (err) reject(err);
-      else resolve(res);
+      if (err) { console.log('rejecting because of ', key); reject(err); }
+      else { resolve(res); }
     });
   });
 }
-
 
 const filterOutDuplicates = async (centers) => {
   if (!centers) return;
 
   const finalCenters = [];
   for (var c of centers) {
-    const rkey = `${c.center_id}-${c.pincode}-${c.date}-${c.minAge}`;
+    const rkey = `${c.center_id}-${c.pincode}-${c.date}-${c.minAge}-${c.vaccine}`;
     const val = await getRedisKey(rkey);
-     
     try {
       if (val && val == `${c.available1}-${c.available2}`) continue;
-      await updateRedisKey(rkey, `${c.available1}-${c.available2}`);
+      await setRedisKey(rkey, `${c.available1}-${c.available2}`);
       finalCenters.push(c);
     } catch (e) {
       finalCenters.push(c);
@@ -156,6 +89,8 @@ const fetchDistricts = (stateId) => {
 
 
 const notifyTelegram = (json, chat_id) => {
+  if (!json.length || !chat_id) return;
+
   var reply_markup =  {
     inline_keyboard: [[
       {
@@ -219,4 +154,4 @@ const tgMessage = (json) => [
 ].join('');
 
 
-module.exports = { notifyTelegram, tgMessage, getAvailableCenters, parseAvailableCenters, getToken, fetchDistricts, filterOutDuplicates, memCount, updateRedisKey }
+module.exports = { notifyTelegram, tgMessage, filterOutDuplicates, fetchDistricts, memCount, setRedisKey, delRedisKey, matchingRedisKey, getRedisKey }

@@ -6,11 +6,8 @@ var bodyParser = require("body-parser")
 const jwt = require('jsonwebtoken');
 const redisClient = require('./redis');
 const apis = require('./apis');
-const utils = require('./utils');
-const { inflxSlotsCaptured, inflxMemCount } = require("./influx");
+const { inflxMemCount } = require("./influx");
 const { getDistricts } = require("./spreadsheet");
-const states = require("./states");
-const config = require("./config");
 var cors = require('cors')
 
 
@@ -23,44 +20,15 @@ app.use(
 
 app.use(cors());
 
-app.post('/fetchCenters', async (req, res) => {
-	let token = null;
-	try {
-		token = await apis.getToken();
-	} catch(e) { console.log('Some error getting token: ', e); }
+app.post('/notify', async (req, res) => {
+	res.json({});
 
+	let { data, cache_date, chan18, chan18_2, chan45 } = req.body;
+	const fData = await apis.filterOutDuplicates(data);
 
-	var timeoutId = setTimeout(() => res.json({}), 50000);
-
-	let results = [];
-	try {
-		const districts = await getDistricts();
-		console.log('===========================Starting Scraping============================')
-		console.log('Token is ', token);
-		Promise.all(districts.map(async (dis) => {
-				const [availCenters18, availCenters45, availCenters18_2] = await apis.getAvailableCenters((token && token.token), dis.id, utils.ddmmyy(new Date()), !!dis.chan18, !!dis.chan45, !!dis.chan18_2);
-
-				availCenters18 && availCenters18.length > 0 && apis.notifyTelegram(availCenters18, dis.chan18).catch(err => console.log('Error notifying telegram: ', err));
-				availCenters45 && availCenters45.length > 0 && apis.notifyTelegram(availCenters45, dis.chan45).catch(err => console.log('Error notifying telegram: ', err));
-				availCenters18_2 && availCenters18_2.length > 0 && apis.notifyTelegram(availCenters18_2, dis.chan18_2).catch(err => console.log('Error notifying telegram: ', err));
-				
-
-				availCenters18 && inflxSlotsCaptured(availCenters18.map(x => ({ ...x, minAge: 18 })));
-				availCenters45 && inflxSlotsCaptured(availCenters45.map(x => ({ ...x, minAge: 45 })));
-				availCenters18_2 && inflxSlotsCaptured(availCenters18_2.map(x => ({ ...x, minAge: 18 })));
-		})).then(() => {
-			console.log('Completeing......')
-			res.json({});
-			clearTimeout(timeoutId);
-		}).catch(e => {
-			console.log('Something went wrong fetching centers....', e);
-			clearTimeout(timeoutId);
-			return res.status(400).send(`Error is ${e.toString()}`);
-		});
-	} catch (e) {
-		console.log('Error is ', e);
-		return res.status(400).send(`Error is ${e.toString()}`);
-	}
+	apis.notifyTelegram(fData.filter(x => x.minAge == 45), chan45);
+	apis.notifyTelegram(fData.filter(x => x.minAge == 18 && x.available2 > 1), chan18_2);
+	apis.notifyTelegram(fData.filter(x => x.minAge == 18 && (!chan18_2 ? x.available > 1 : x.available1 > 1)), chan18);
 });
 
 app.post('/setToken', (req, res) => {
@@ -70,7 +38,7 @@ app.post('/setToken', (req, res) => {
 
 		const expiry = obj.exp - (Date.now()/1000) - 5;
 		console.log(`Setting token on ${new Date()}`);
-		redisClient.setex('token', Math.floor(expiry), req.body.token, err => {
+		redisClient.setex(`token-${Date.now()}`, Math.floor(expiry), req.body.token, err => {
 			if (err) return res.status(400).json({ err });
 			res.json({ token: req.body.token })
 		});
@@ -78,31 +46,25 @@ app.post('/setToken', (req, res) => {
 });
 
 
-app.get('/test', async (req, res) => {
-	apis
-		.notifyTelegram([{ center: 'Test', pincode: 212222, available1: 23, available2: 34, date: '12-12-2021', district: 'TestPune', vaccine: 'COVAXIN' }], config.godChatId)
-		.then(res => console.log('test response is ', res))
-		.catch(err => console.log('test error is ', err))
-	res.json({})
-});
-
-
-app.get('/states', async (req, res) => {
-	var allStates = await Promise.all(states.map(async (s) => {
-		const resp = await apis.fetchDistricts(s.state_id);
-		console.log('district is ', resp.districts);
-		s.districts = resp.districts;
-		return s;
-	}));
-	res.setHeader('Content-Type', 'application/json');
-	res.json(allStates);
-});
-
 app.get('/districts', async (req, res) => {
 	const districts = await getDistricts();
 	res.setHeader('Content-Type', 'application/json');
 	res.json(districts)
-})
+});
+
+
+app.get('/getToken',  (req, res) => {
+  apis.matchingRedisKey('*token-*').then(found => {
+		if (!found || !found.length) return res.status(422).send('No token available right now.');
+
+		apis.getRedisKey(found[0]).then((rRes) => {
+			if (!rRes) return res.status(422).send('No token available right now.');
+			res.json({ token: rRes });
+			apis.delRedisKey(found[0]);
+		})
+	})
+});
+
 
 app.get('/memCount', async (req, res) => {
 	const districts = await getDistricts();
