@@ -13,8 +13,9 @@ var cors = require('cors')
 
 app.use(bodyParser.json()) // for parsing application/json
 app.use(
-	bodyParser.urlencoded({
+	express.urlencoded({
 		extended: true,
+		limit: '10mb'
 	})
 ) // for parsing application/x-www-form-urlencoded
 
