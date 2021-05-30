@@ -7,6 +7,7 @@ const apis = require('./apis');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const redisClient = require('./redis');
+const { inflxScheduled, inflxScheduledTime } = require("./influx");
 
 
 
@@ -84,6 +85,23 @@ app.post('/setToken', (req, res) => {
 	} catch (e) { res.status(400).send(`Error: Something went wrong ${e.toString()}`) }
 });
 
+
+app.get('/getToken',  (req, res) => {
+  apis.matchingRedisKey('*token-*').then(found => {
+		if (!found || !found.length) return res.status(422).send('No token available right now.');
+
+		apis.getRedisKey(found[0]).then((rRes) => {
+			if (!rRes) return res.status(422).send('No token available right now.');
+			res.json({ token: rRes });
+			apis.delRedisKey(found[0]);
+		})
+	})
+});
+
+app.post('/logSchedule', (req, res) => {
+	inflxScheduledTime(req.body);
+	res.json({});
+})
 
 
 app.get('/', (req, res) => res.json({ hello: 'world' }))

@@ -91,7 +91,7 @@ const setToken = (token) => {
       if (Date.now() > obj.exp*1000) return;
   
       const expiry = obj.exp - (Date.now()/1000) - 5;
-      redisClient.setex('token', Math.floor(expiry), token, err => {
+      redisClient.setex(`token-${Date.now()}`, Math.floor(expiry), token, err => {
         if (err) reject();
         resolve({ token });
       });
@@ -187,5 +187,51 @@ const schedule = (data) => {
   });
 }
 
+const setRedisKey = (key, newValue, timeout) => {
+  return new Promise((resolve, reject) => {
+    localRedis.del(key, () => {
+      localRedis.setex(key, timeout || 60*60*3, newValue, (err, res) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  })
+}
 
-module.exports = { validateOTP, requestOTP, setToken, getBeneficiaries, getRecaptha, schedule }
+const delRedisKey = (key) => {
+  return new Promise((resolve, reject) => {
+    localRedis.del(key, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  })
+} 
+
+
+const matchingRedisKey = async (pattern) => {
+  const scan = promisify(localRedis.scan).bind(localRedis);
+  const found = [];
+  let cursor = '0';
+
+  do {
+    const reply = await scan(cursor, 'MATCH', pattern);
+
+    cursor = reply[0];
+    found.push(...reply[1]);
+  } while (cursor !== '0');
+
+  return found;
+}
+
+
+const getRedisKey = (key) => {
+  return new Promise((resolve, reject) => {
+    localRedis.get(key, (err, res) => {
+      if (err) { console.log('rejecting because of ', key); reject(err); }
+      else { resolve(res); }
+    });
+  });
+}
+
+
+module.exports = { validateOTP, requestOTP, setToken, getBeneficiaries, getRecaptha, schedule, setRedisKey, getRedisKey, delRedisKey, matchingRedisKey }
