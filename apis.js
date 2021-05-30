@@ -4,7 +4,6 @@ const utils = require('./utils');
 const jwt = require('jsonwebtoken');
 const config = require('./config');
 const NodeCache = require( "node-cache" );
-const myCache = new NodeCache({ stdTTL: 100, checkperiod: 120 });
 const localRedis = require('./localRedis');
 const { promisify } = require('util');
 
@@ -101,9 +100,9 @@ const notifyTelegram = (json, chat_id) => {
   };
 
   // const text = (chat_id == '@vaccinepune' || chat_id == '@vaccinebarodaanand' || chat_id == '@vaccineahmedabad') ? tgMessageUpgraded(json) : tgMessage(json);
-  const text = tgMessage(json);
+  // const text = tgMessage(json);
 
-  // const text = tgMessageUpgraded(json);
+  const text = tgMessageUpgraded(json);
 
   return fetch(`https://api.telegram.org/bot${config.tgBot.token}/sendMessage?parse_mode=html`, {
     method: 'POST',
@@ -130,8 +129,8 @@ const tgMessageUpgraded = (json) => [
   '<b>New available slots</b> \n\n',
   ...json.map(x => [
     `📍 Pin Code <b>${x.pincode}</b>`,
-    x.available1 > 1 ? `🪑 Dose 1️⃣ Available <b>${x.available1}</b> (<a href="${`https://vn-booker.tunnelto.dev?cid=${x.center_id}&slot=${x.slots}&date=${x.date}&cn=${x.center}&sid=${x.session_id}&dose=1&age=${x.minAge}`}">Book [Beta]</a>)` : '',
-    x.available2 > 1 ? `🪑 Dose 2️⃣ Available <b>${x.available2}</b> (<a href="${`https://vn-booker.tunnelto.dev?cid=${x.center_id}&slot=${x.slots}&date=${x.date}&cn=${x.center}&sid=${x.session_id}&dose=2&age=${x.minAge}`}">Book [Beta]</a>)` : '', 
+    x.available1 > 1 ? `🪑 Dose 1️⃣ Available <b>${x.available1}</b> (<a href="${`https://book-r41.netlify.app?cid=${x.center_id}&slot=${x.slots}&date=${x.date}&cn=${x.center}&sid=${x.session_id}&dose=1&age=${x.minAge}`}">Book [Beta]</a>)` : '',
+    x.available2 > 1 ? `🪑 Dose 2️⃣ Available <b>${x.available2}</b> (<a href="${`https://book-r41.netlify.app?cid=${x.center_id}&slot=${x.slots}&date=${x.date}&cn=${x.center}&sid=${x.session_id}&dose=2&age=${x.minAge}`}">Book [Beta]</a>)` : '', 
     `🗓 ${x.date}`,
     `💉 ${utils.capitalize(x.vaccine) || '?'}`,
     `🏥 ${x.center}, <b>${x.district}</b>\n\n`,
