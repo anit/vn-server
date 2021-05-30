@@ -29,8 +29,8 @@ const delRedisKey = (key) => {
 } 
 
 
-const matchingRedisKey = async (pattern) => {
-  const scan = promisify(localRedis.scan).bind(localRedis);
+const matchingRedisKey = async (pattern, isRemoteRedis) => {
+  const scan =  isRemoteRedis ? promisify(redisClient.scan).bind(redisClient) :promisify(localRedis.scan).bind(localRedis);
   const found = [];
   let cursor = '0';
 
@@ -45,9 +45,10 @@ const matchingRedisKey = async (pattern) => {
 }
 
 
-const getRedisKey = (key) => {
+const getRedisKey = (key, isRemoteRedis) => {
+  let redisC = isRemoteRedis ? redisClient : localRedis;
   return new Promise((resolve, reject) => {
-    localRedis.get(key, (err, res) => {
+    redisC.get(key, (err, res) => {
       if (err) { console.log('rejecting because of ', key); reject(err); }
       else { resolve(res); }
     });

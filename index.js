@@ -54,15 +54,22 @@ app.get('/districts', async (req, res) => {
 
 
 app.get('/getToken',  (req, res) => {
-  apis.matchingRedisKey('*token-*').then(found => {
+  apis.matchingRedisKey('*token-*', true).then(found => {
+
 		if (!found || !found.length) return res.status(422).send('No token available right now.');
 
-		apis.getRedisKey(found[0]).then((rRes) => {
+		apis.getRedisKey(found[0], true).then((rRes, err) => {
 			if (!rRes) return res.status(422).send('No token available right now.');
-			res.json({ token: rRes });
-			apis.delRedisKey(found[0]);
+			res.json({ token: rRes, key: found[0] });
 		})
 	})
+});
+
+app.post('/deleteToken', (req, res) => {
+	if (!req.body.key) res.status(400).send('Error');
+
+	apis.delRedisKey(req.body.key);
+	res.json({});
 });
 
 
