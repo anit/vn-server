@@ -23,14 +23,17 @@ app.use(cors());
 
 app.post('/notify', async (req, res) => {
 	res.json({});
-
 	let { data, cache_date, chan18, chan18_2, chan45, id } = req.body;
-	const fData = await apis.filterOutDuplicates(data);
 	console.log('Cache date is ', cache_date, ' for ', id);
 
-	apis.notifyTelegram(data.chan18, chan18);
-	apis.notifyTelegram(data.chan45, chan45);
-	apis.notifyTelegram(data.chan18_2, chan18_2);
+	let fData = await apis.filterOutDuplicates(data.chan18);
+	apis.notifyTelegram(fData, chan18);
+
+	fData = await apis.filterOutDuplicates(data.chan45);
+	apis.notifyTelegram(fData, chan45);
+
+	fData = await apis.filterOutDuplicates(data.chan18_2);
+	apis.notifyTelegram(fData, chan18_2);
 });
 
 app.post('/setToken', (req, res) => {
