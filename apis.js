@@ -89,7 +89,7 @@ const fetchDistricts = (stateId) => {
 
 
 const notifyTelegram = (json, chat_id) => {
-  if (!json.length || !chat_id) return;
+  if (!json || !json.length || !chat_id) return;
 
   var reply_markup =  {
     inline_keyboard: [[
