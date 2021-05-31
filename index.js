@@ -28,8 +28,13 @@ app.post('/notify', async (req, res) => {
 	const fData = await apis.filterOutDuplicates(data);
 
 	apis.notifyTelegram(fData.filter(x => x.minAge == 45), chan45);
-	apis.notifyTelegram(fData.filter(x => x.minAge == 18 && x.available2 > 1), chan18_2);
-	apis.notifyTelegram(fData.filter(x => x.minAge == 18 && (!chan18_2 ? x.available > 1 : x.available1 > 1)), chan18);
+	apis.notifyTelegram(fData.filter(x => x.minAge == 18 && x.available2 > 1).map(x => ({ ...x, available1: 0 })), chan18_2);
+
+	if (chan18 && !chan18_2) { // Show all doses
+		apis.notifyTelegram(fData.filter(x => x.minAge == 18 && x.available > 1), chan18);	
+	} else if(chan18 && chan18_2) { // Only show dose1 coz there is a channel for dose 2
+		apis.notifyTelegram(fData.filter(x => x.minAge == 18 && x.available1 > 1).map(x => ({ ...x, available2: 0 })), chan18);
+	}
 });
 
 app.post('/setToken', (req, res) => {
