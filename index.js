@@ -24,17 +24,13 @@ app.use(cors());
 app.post('/notify', async (req, res) => {
 	res.json({});
 
-	let { data, cache_date, chan18, chan18_2, chan45 } = req.body;
+	let { data, cache_date, chan18, chan18_2, chan45, id } = req.body;
 	const fData = await apis.filterOutDuplicates(data);
+	console.log('Cache date is ', cache_date, ' for ', id);
 
-	apis.notifyTelegram(fData.filter(x => x.minAge == 45), chan45);
-	apis.notifyTelegram(fData.filter(x => x.minAge == 18 && x.available2 > 1).map(x => ({ ...x, available1: 0 })), chan18_2);
-
-	if (chan18 && !chan18_2) { // Show all doses
-		apis.notifyTelegram(fData.filter(x => x.minAge == 18 && x.available > 1), chan18);	
-	} else if(chan18 && chan18_2) { // Only show dose1 coz there is a channel for dose 2
-		apis.notifyTelegram(fData.filter(x => x.minAge == 18 && x.available1 > 1).map(x => ({ ...x, available2: 0 })), chan18);
-	}
+	apis.notifyTelegram(data.chan18, chan18);
+	apis.notifyTelegram(data.chan45, chan45);
+	apis.notifyTelegram(data.chan18_2, chan18_2);
 });
 
 app.post('/setToken', (req, res) => {
