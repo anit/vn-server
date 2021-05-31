@@ -47,9 +47,9 @@ const matchingRedisKey = async (pattern, isRemoteRedis) => {
 
 const getRedisKey = (key, isRemoteRedis) => {
   let redisC = isRemoteRedis ? redisClient : localRedis;
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     redisC.get(key, (err, res) => {
-      if (err) { console.log('rejecting because of ', key); reject(err); }
+      if (err) { console.log('rejecting because of ', key); resolve(null); }
       else { resolve(res); }
     });
   });

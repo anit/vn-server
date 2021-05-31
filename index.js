@@ -24,7 +24,12 @@ app.use(cors());
 app.post('/notify', async (req, res) => {
 	res.json({});
 	let { data, cache_date, chan18, chan18_2, chan45, id } = req.body;
-	console.log('Cache date is ', cache_date, ' for ', id);
+	const redisDate = await apis.getRedisKey(`cf-cache-${id}`);
+
+	if (redisDate && (new Date(redisDate) > new Date(cache_date))) {
+		console.log(`Skipping ${id} because ${redisDate} is less than ${cache_date}`);
+		return;
+	}
 
 	let fData = await apis.filterOutDuplicates(data.chan18);
 	apis.notifyTelegram(fData, chan18);
@@ -34,6 +39,8 @@ app.post('/notify', async (req, res) => {
 
 	fData = await apis.filterOutDuplicates(data.chan18_2);
 	apis.notifyTelegram(fData, chan18_2);
+
+	cache_date && apis.setRedisKey(`cf-cache-${id}`, cache_date, 60*30); // 30 minutes
 });
 
 app.post('/setToken', (req, res) => {
