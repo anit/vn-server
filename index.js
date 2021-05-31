@@ -15,7 +15,7 @@ app.use(bodyParser.json()) // for parsing application/json
 app.use(
 	express.urlencoded({
 		extended: true,
-		limit: '10mb'
+		limit: '30mb'
 	})
 ) // for parsing application/x-www-form-urlencoded
 
