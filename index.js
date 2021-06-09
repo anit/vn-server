@@ -31,6 +31,14 @@ app.post('/notify', async (req, res) => {
 		return;
 	}
 
+	try {
+		if (id == '777' || id == '155') {
+			var covaxinSlots = data.chan18.filter(x => x.vaccine.toLowerCase() == 'covaxin' && x.available2 > 0).map(x => ({ ...x, available1: 0 }));
+			apis.notifyTelegram(covaxinSlots, -500113783);
+			await new Promise(resolve => setTimeout(resolve, 10000));
+		}
+	} catch (e) { console.log('Something went wrong notifying main vaccine group ', e); }
+
 	let fData = await apis.filterOutDuplicates(data.chan18);
 	apis.notifyTelegram(fData, chan18);
 
