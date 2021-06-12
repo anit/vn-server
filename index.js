@@ -24,6 +24,12 @@ app.use(cors());
 app.post('/notify', async (req, res) => {
 	res.json({});
 	let { data, cache_date, chan18, chan18_2, chan45, id } = req.body;
+
+	if (!data) {
+		console.log('No data found for ', id);
+		return; 
+	}
+
 	const redisDate = await apis.getRedisKey(`cf-cache-${id}`);
 
 	if (redisDate && (new Date(redisDate) > new Date(cache_date))) {
@@ -67,9 +73,21 @@ app.post('/setToken', (req, res) => {
 
 
 app.get('/districts', async (req, res) => {
-	const districts = await getDistricts();
+	let districts = await getDistricts();
+	let districtsWithDate = Promise.all(districts.map(x => ({
+		...x,
+		cache_date: await apis.getRedisKey(`cf-cache-${x.id}`)
+	})));
+
 	res.setHeader('Content-Type', 'application/json');
-	res.json(districts)
+	res.json(districtsWithDate.sort((x, y) => {
+		if (!x.cache_date) return -1;
+		if (!y.cache_date) return 1;
+
+
+		if (new Date(x.cache_date) > new Date(y.cache_date)) return 1;
+		else return -1;
+	}));
 });
 
 
