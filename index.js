@@ -25,8 +25,8 @@ app.post('/notify', async (req, res) => {
 	res.json({});
 	let { data, cache_date, chan18, chan18_2, chan45, id } = req.body;
 
-	if (!data) {
-		console.log('No data found for ', id);
+	if (!data || (!data.chan18?.length && !data.chan18_2?.length && !data.chan45?.length)) {
+		console.log('No data found for ', id, data);
 		return; 
 	}
 
@@ -74,7 +74,7 @@ app.post('/setToken', (req, res) => {
 
 app.get('/districts', async (req, res) => {
 	let districts = await getDistricts();
-	let districtsWithDate = Promise.all(districts.map(async (x) => ({
+	let districtsWithDate = await Promise.all(districts.map(async (x) => ({
 		...x,
 		cache_date: await apis.getRedisKey(`cf-cache-${x.id}`)
 	})));
