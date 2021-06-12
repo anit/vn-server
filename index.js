@@ -74,7 +74,7 @@ app.post('/setToken', (req, res) => {
 
 app.get('/districts', async (req, res) => {
 	let districts = await getDistricts();
-	let districtsWithDate = Promise.all(districts.map(x => ({
+	let districtsWithDate = Promise.all(districts.map(async (x) => ({
 		...x,
 		cache_date: await apis.getRedisKey(`cf-cache-${x.id}`)
 	})));
