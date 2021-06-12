@@ -133,7 +133,7 @@ const tgMessageUpgraded = (json) => [
     x.available1 > 1 ? `🪑 Dose 1️⃣ Available <b>${x.available1}</b> (<a href="${`https://book-r41.netlify.app?cid=${x.center_id}&slot=${x.slots}&date=${x.date}&cn=${x.center}&sid=${x.session_id}&dose=1&age=${x.minAge}`}">Book [Beta]</a>)` : '',
     x.available2 > 1 ? `🪑 Dose 2️⃣ Available <b>${x.available2}</b> (<a href="${`https://book-r41.netlify.app?cid=${x.center_id}&slot=${x.slots}&date=${x.date}&cn=${x.center}&sid=${x.session_id}&dose=2&age=${x.minAge}`}">Book [Beta]</a>)` : '', 
     `🗓 ${x.date}`,
-    `💉 ${utils.capitalize(x.vaccine) || '?'}`,
+    `💉 ${utils.capitalize(x.vaccine) || '?'}${x.fee ? '(₹' + x.fee +')' : '' }`,
     `🏥 ${x.center}, <b>${x.district}</b>\n\n`,
   ].filter(x => !!x).join('\n')),
   '•••••\n\n'
